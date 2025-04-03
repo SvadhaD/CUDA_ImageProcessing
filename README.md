@@ -4,23 +4,28 @@ Project Overview
 	This project implements CUDA-based parallel programming for image processing, focusing on convolution and morphological operations. Each operation is executed in separate CUDA kernels for optimized performance.
 
 System Requirements
-
 	To run this project, ensure your system meets the following requirements:
 
 Hardware Requirements:
-
-	• GPU: NVIDIA GPU with CUDA Compute Capability 5.0 or higher
- 	• RAM: Minimum 8GB (16GB recommended)
-  	• Storage: At least 2GB of free disk space
+• GPU: NVIDIA GPU with CUDA Compute Capability 5.0 or higher
+ 
+• RAM: Minimum 8GB (16GB recommended)
+ 
+• Storage: At least 2GB of free disk space
 
 Software Requirements:
 
-	• Operating System: Windows 10/11 (64-bit)
-	• CUDA Toolkit: Version 11.0 or later
-	• NVIDIA Drivers: Latest version supporting the installed CUDA Toolkit
-	• CMake: Version 3.16 or later
-	• OpenCV: Version 4.5 or later (C++ version, not just Python bindings)
-	• Visual Studio: Version 2019/2022 (Community or Professional Edition)
+• Operating System: Windows 10/11 (64-bit)
+
+• CUDA Toolkit: Version 11.0 or later
+
+• NVIDIA Drivers: Latest version supporting the installed CUDA Toolkit
+
+• CMake: Version 3.16 or later
+
+• OpenCV: Version 4.5 or later (C++ version, not just Python bindings)
+
+• Visual Studio: Version 2019/2022 (Community or Professional Edition)
 
 Installation Steps
 
