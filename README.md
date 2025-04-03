@@ -52,14 +52,18 @@ Installation Steps
    
    
 	Method 2: Using vcpkg
-		1.	Install vcpkg (if not already installed):
-		2.	git clone https://github.com/microsoft/vcpkg.git
-		3.	cd vcpkg
-		4.	bootstrap-vcpkg.bat
-		5.	Install OpenCV using vcpkg:
-		6.	vcpkg install opencv[core,imgproc,highgui]:x64-windows
-		7.	Run:
-		8.	vcpkg integrate install
+
+	1. Install vcpkg (if not already installed)
+
+			git clone https://github.com/microsoft/vcpkg.git
+			cd vcpkg
+			bootstrap-vcpkg.bat
+	2. Install OpenCV using vcpkg:
+    
+    		vcpkg install opencv[core,imgproc,highgui]:x64-windows
+	3. Run:
+    
+    		vcpkg integrate install
    
 5. Install CMake
 	1. Download CMake from CMake's official site.
