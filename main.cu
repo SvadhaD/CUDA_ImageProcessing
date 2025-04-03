@@ -12,7 +12,9 @@ using namespace std;
 void comparePerformance(const Mat& inputImage, int kernelSize) {
     Mat cpuOutput(inputImage.size(), CV_8UC1);
     Mat gpuOutput(inputImage.size(), CV_8UC1);
-    vector<float> kernel(kernelSize * kernelSize, 1.0f / (kernelSize * kernelSize));
+    
+    // Convolution kernel - Use float for convolution
+    vector<float> kernel(kernelSize * kernelSize, 1.0f / (kernelSize * kernelSize));  // Normalized kernel
     
     // CPU Convolution
     auto start = chrono::high_resolution_clock::now();
@@ -45,15 +47,43 @@ int main(int argc, char** argv) {
     Mat dilatedImage(inputImage.size(), CV_8UC1);
     Mat erodedImage(inputImage.size(), CV_8UC1);
     
-    int structuringElement[9] = { 0, 1, 0, 1, 1, 1, 0, 1, 0 };
+    int kernelSize = 3;
+    vector<int> morphologyKernel(kernelSize * kernelSize, 1);  // 3x3 kernel for morphology
     
-    applyDilation(inputImage.data, dilatedImage.data, structuringElement, inputImage.cols, inputImage.rows, 3);
-    applyErosion(inputImage.data, erodedImage.data, structuringElement, inputImage.cols, inputImage.rows, 3);
+    // Apply GPU and CPU Erosion and Dilation
+    Mat cpuDilatedImage(inputImage.size(), CV_8UC1);
+    Mat cpuErodedImage(inputImage.size(), CV_8UC1);
     
-    imwrite("dilated.png", dilatedImage);
-    imwrite("eroded.png", erodedImage);
+    // CPU Erosion
+    auto start = chrono::high_resolution_clock::now();
+    cpu_erosion(inputImage, cpuErodedImage, morphologyKernel);
+    auto end = chrono::high_resolution_clock::now();
+    cout << "CPU Erosion Time: " << chrono::duration<double, milli>(end - start).count() << " ms" << endl;
     
-    comparePerformance(inputImage, 3);
+    // GPU Erosion
+    start = chrono::high_resolution_clock::now();
+    gpu_erosion(inputImage.data, erodedImage.data, inputImage.cols, inputImage.rows, morphologyKernel.data(), kernelSize);
+    end = chrono::high_resolution_clock::now();
+    cout << "GPU Erosion Time: " << chrono::duration<double, milli>(end - start).count() << " ms" << endl;
+    
+    // CPU Dilation
+    start = chrono::high_resolution_clock::now();
+    cpu_dilation(inputImage, cpuDilatedImage, morphologyKernel);
+    end = chrono::high_resolution_clock::now();
+    cout << "CPU Dilation Time: " << chrono::duration<double, milli>(end - start).count() << " ms" << endl;
+    
+    // GPU Dilation
+    start = chrono::high_resolution_clock::now();
+    gpu_dilation(inputImage.data, dilatedImage.data, inputImage.cols, inputImage.rows, morphologyKernel.data(), kernelSize);
+    end = chrono::high_resolution_clock::now();
+    cout << "GPU Dilation Time: " << chrono::duration<double, milli>(end - start).count() << " ms" << endl;
+    
+    imwrite("cpu_erosion.png", cpuErodedImage);
+    imwrite("gpu_erosion.png", erodedImage);
+    imwrite("cpu_dilation.png", cpuDilatedImage);
+    imwrite("gpu_dilation.png", dilatedImage);
+    
+    comparePerformance(inputImage, kernelSize);
     
     cout << "Processing complete. Output images saved." << endl;
     return 0;
