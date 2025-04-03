@@ -103,11 +103,5 @@ Step 3: Run the Executable
 Step 4: Verify Output
 	Check output_image.jpg to see the processed result.
 
-Troubleshooting
 
-1. CUDA not found? Ensure nvcc is in your system PATH.
-
-2. OpenCV not found? Ensure opencv_world.lib is linked correctly.
-
-3. Performance issues? Try optimizing kernel launch configurations.
 
