@@ -13,8 +13,7 @@ void comparePerformance(const Mat& inputImage, int kernelSize) {
     Mat cpuOutput(inputImage.size(), CV_8UC1);
     Mat gpuOutput(inputImage.size(), CV_8UC1);
     
-    // Convolution kernel - Use float for convolution
-    vector<float> kernel(kernelSize * kernelSize, 1.0f / (kernelSize * kernelSize));  // Normalized kernel
+    vector<float> kernel(kernelSize * kernelSize, 1.0f / (kernelSize * kernelSize)); 
     
     // CPU Convolution
     auto start = chrono::high_resolution_clock::now();
@@ -48,9 +47,8 @@ int main(int argc, char** argv) {
     Mat erodedImage(inputImage.size(), CV_8UC1);
     
     int kernelSize = 3;
-    vector<int> morphologyKernel(kernelSize * kernelSize, 1);  // 3x3 kernel for morphology
+    vector<int> morphologyKernel(kernelSize * kernelSize, 1); 
     
-    // Apply GPU and CPU Erosion and Dilation
     Mat cpuDilatedImage(inputImage.size(), CV_8UC1);
     Mat cpuErodedImage(inputImage.size(), CV_8UC1);
     
