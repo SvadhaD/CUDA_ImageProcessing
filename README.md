@@ -21,8 +21,6 @@ Software Requirements:
 
 • NVIDIA Drivers: Latest version supporting the installed CUDA Toolkit
 
-• CMake: Version 3.16 or later
-
 • OpenCV: Version 4.5 or later (C++ version, not just Python bindings)
 
 • Visual Studio: Version 2019/2022 (Community or Professional Edition)
@@ -70,14 +68,6 @@ Installation Steps
     
     		vcpkg integrate install
    
-5. Install CMake
-	1. Download CMake from CMake's official site.
-    
-	2. Install and add CMake to system PATH.
-    
-	3. Verify installation:
-    
-	4. cmake --version
 
 
 Compilation and Execution
