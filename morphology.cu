@@ -1,109 +1,148 @@
 #include "morphology.cuh"
-#include "utils.cuh"
 #include <cuda_runtime.h>
-#include <device_launch_parameters.h>
+#include <opencv2/opencv.hpp>
 #include <iostream>
 
-#define TILE_SIZE 16
-
-__global__ void dilationKernel(const unsigned char* inputImage, unsigned char* outputImage, 
-                               const int* structuringElement, int imageWidth, int imageHeight, 
-                               int elementWidth) {
-    int tx = threadIdx.x, ty = threadIdx.y;
-    int row = blockIdx.y * blockDim.y + ty;
-    int col = blockIdx.x * blockDim.x + tx;
-    int halfElement = elementWidth / 2;
-
-    if (row < imageHeight && col < imageWidth) {
-        unsigned char maxVal = 0;
-        for (int i = -halfElement; i <= halfElement; i++) {
-            for (int j = -halfElement; j <= halfElement; j++) {
-                int x = min(max(col + j, 0), imageWidth - 1);
-                int y = min(max(row + i, 0), imageHeight - 1);
-                if (structuringElement[(i + halfElement) * elementWidth + (j + halfElement)] == 1) {
-                    maxVal = max(maxVal, inputImage[y * imageWidth + x]);
+// CPU implementation of erosion
+void cpu_erosion(const cv::Mat& inputImage, cv::Mat& outputImage, const std::vector<int>& kernel) {
+    int kernelSize = 3;
+    int offset = kernelSize / 2;
+    
+    for (int i = offset; i < inputImage.rows - offset; ++i) {
+        for (int j = offset; j < inputImage.cols - offset; ++j) {
+            uchar minValue = 255;
+            for (int ki = 0; ki < kernelSize; ++ki) {
+                for (int kj = 0; kj < kernelSize; ++kj) {
+                    int ni = i + ki - offset;
+                    int nj = j + kj - offset;
+                    if (kernel[ki * kernelSize + kj] == 1) {
+                        minValue = std::min(minValue, inputImage.at<uchar>(ni, nj));
+                    }
                 }
             }
+            outputImage.at<uchar>(i, j) = minValue;
         }
-        outputImage[row * imageWidth + col] = maxVal;
     }
 }
 
-__global__ void erosionKernel(const unsigned char* inputImage, unsigned char* outputImage, 
-                              const int* structuringElement, int imageWidth, int imageHeight, 
-                              int elementWidth) {
-    int tx = threadIdx.x, ty = threadIdx.y;
-    int row = blockIdx.y * blockDim.y + ty;
-    int col = blockIdx.x * blockDim.x + tx;
-    int halfElement = elementWidth / 2;
-
-    if (row < imageHeight && col < imageWidth) {
-        unsigned char minVal = 255;
-        for (int i = -halfElement; i <= halfElement; i++) {
-            for (int j = -halfElement; j <= halfElement; j++) {
-                int x = min(max(col + j, 0), imageWidth - 1);
-                int y = min(max(row + i, 0), imageHeight - 1);
-                if (structuringElement[(i + halfElement) * elementWidth + (j + halfElement)] == 1) {
-                    minVal = min(minVal, inputImage[y * imageWidth + x]);
+// CPU implementation of dilation
+void cpu_dilation(const cv::Mat& inputImage, cv::Mat& outputImage, const std::vector<int>& kernel) {
+    int kernelSize = 3; 
+    int offset = kernelSize / 2;
+    
+    for (int i = offset; i < inputImage.rows - offset; ++i) {
+        for (int j = offset; j < inputImage.cols - offset; ++j) {
+            uchar maxValue = 0;
+            for (int ki = 0; ki < kernelSize; ++ki) {
+                for (int kj = 0; kj < kernelSize; ++kj) {
+                    int ni = i + ki - offset;
+                    int nj = j + kj - offset;
+                    if (kernel[ki * kernelSize + kj] == 1) {
+                        maxValue = std::max(maxValue, inputImage.at<uchar>(ni, nj));
+                    }
                 }
             }
+            outputImage.at<uchar>(i, j) = maxValue;
         }
-        outputImage[row * imageWidth + col] = minVal;
     }
 }
 
-void applyDilation(const unsigned char* h_inputImage, unsigned char* h_outputImage, 
-                   const int* h_structuringElement, int imageWidth, int imageHeight, int elementWidth) {
-    unsigned char *d_inputImage, *d_outputImage;
-    int *d_structuringElement;
-    int imageSize = imageWidth * imageHeight * sizeof(unsigned char);
-    int elementSize = elementWidth * elementWidth * sizeof(int);
+// GPU kernel for erosion
+__global__ void gpu_erosion_kernel(const uchar* input, uchar* output, int width, int height, const uchar* kernel, int kernelSize) {
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-    cudaMalloc((void**)&d_inputImage, imageSize);
-    cudaMalloc((void**)&d_outputImage, imageSize);
-    cudaMalloc((void**)&d_structuringElement, elementSize);
+    int offset = kernelSize / 2;
 
-    cudaMemcpy(d_inputImage, h_inputImage, imageSize, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_structuringElement, h_structuringElement, elementSize, cudaMemcpyHostToDevice);
+    if (x >= offset && x < width - offset && y >= offset && y < height - offset) {
+        uchar minValue = 255;
 
-    dim3 blockSize(TILE_SIZE, TILE_SIZE);
-    dim3 gridSize((imageWidth + TILE_SIZE - 1) / TILE_SIZE, 
-                  (imageHeight + TILE_SIZE - 1) / TILE_SIZE);
+        for (int ki = -offset; ki <= offset; ++ki) {
+            for (int kj = -offset; kj <= offset; ++kj) {
+                int ni = y + ki; 
+                int nj = x + kj;
 
-    dilationKernel<<<gridSize, blockSize>>>(d_inputImage, d_outputImage, d_structuringElement, imageWidth, imageHeight, elementWidth);
-    cudaDeviceSynchronize();
+                if (kernel[(ki + offset) * kernelSize + (kj + offset)] == 1) {
+                    minValue = min(minValue, input[ni * width + nj]);
+                }
+            }
+        }
 
-    cudaMemcpy(h_outputImage, d_outputImage, imageSize, cudaMemcpyDeviceToHost);
-
-    cudaFree(d_inputImage);
-    cudaFree(d_outputImage);
-    cudaFree(d_structuringElement);
+        output[y * width + x] = minValue;
+    }
 }
 
-void applyErosion(const unsigned char* h_inputImage, unsigned char* h_outputImage, 
-                  const int* h_structuringElement, int imageWidth, int imageHeight, int elementWidth) {
-    unsigned char *d_inputImage, *d_outputImage;
-    int *d_structuringElement;
-    int imageSize = imageWidth * imageHeight * sizeof(unsigned char);
-    int elementSize = elementWidth * elementWidth * sizeof(int);
+// GPU kernel for dilation
+__global__ void gpu_dilation_kernel(const uchar* input, uchar* output, int width, int height, const uchar* kernel, int kernelSize) {
+    int x = blockIdx.x * blockDim.x + threadIdx.x;
+    int y = blockIdx.y * blockDim.y + threadIdx.y;
 
-    cudaMalloc((void**)&d_inputImage, imageSize);
-    cudaMalloc((void**)&d_outputImage, imageSize);
-    cudaMalloc((void**)&d_structuringElement, elementSize);
+    int offset = kernelSize / 2;
 
-    cudaMemcpy(d_inputImage, h_inputImage, imageSize, cudaMemcpyHostToDevice);
-    cudaMemcpy(d_structuringElement, h_structuringElement, elementSize, cudaMemcpyHostToDevice);
+    if (x >= offset && x < width - offset && y >= offset && y < height - offset) {
+        uchar maxValue = 0;
 
-    dim3 blockSize(TILE_SIZE, TILE_SIZE);
-    dim3 gridSize((imageWidth + TILE_SIZE - 1) / TILE_SIZE, 
-                  (imageHeight + TILE_SIZE - 1) / TILE_SIZE);
+        for (int ki = -offset; ki <= offset; ++ki) {
+            for (int kj = -offset; kj <= offset; ++kj) {
+                int ni = y + ki; 
+                int nj = x + kj; 
 
-    erosionKernel<<<gridSize, blockSize>>>(d_inputImage, d_outputImage, d_structuringElement, imageWidth, imageHeight, elementWidth);
-    cudaDeviceSynchronize();
+                if (kernel[(ki + offset) * kernelSize + (kj + offset)] == 1) {
+                    maxValue = max(maxValue, input[ni * width + nj]);
+                }
+            }
+        }
 
-    cudaMemcpy(h_outputImage, d_outputImage, imageSize, cudaMemcpyDeviceToHost);
+        output[y * width + x] = maxValue;
+    }
+}
 
-    cudaFree(d_inputImage);
-    cudaFree(d_outputImage);
-    cudaFree(d_structuringElement);
+// GPU erosion wrapper
+void gpu_erosion(const uchar* input, uchar* output, int width, int height, const int* kernel, int kernelSize) {
+    uchar *d_input, *d_output, *d_kernel;
+    size_t imageSize = width * height * sizeof(uchar);
+    size_t kernelSizeBytes = kernelSize * kernelSize * sizeof(int);
+
+    cudaMalloc(&d_input, imageSize);
+    cudaMalloc(&d_output, imageSize);
+    cudaMalloc(&d_kernel, kernelSizeBytes);
+    
+    cudaMemcpy(d_input, input, imageSize, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_kernel, kernel, kernelSizeBytes, cudaMemcpyHostToDevice);
+
+    dim3 blockSize(16, 16);
+    dim3 gridSize((width + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
+
+    gpu_erosion_kernel<<<gridSize, blockSize>>>(d_input, d_output, width, height, d_kernel, kernelSize);
+    
+    cudaMemcpy(output, d_output, imageSize, cudaMemcpyDeviceToHost);
+    
+    cudaFree(d_input);
+    cudaFree(d_output);
+    cudaFree(d_kernel);
+}
+
+// GPU dilation wrapper
+void gpu_dilation(const uchar* input, uchar* output, int width, int height, const int* kernel, int kernelSize) {
+    uchar *d_input, *d_output, *d_kernel;
+    size_t imageSize = width * height * sizeof(uchar);
+    size_t kernelSizeBytes = kernelSize * kernelSize * sizeof(int);
+
+    cudaMalloc(&d_input, imageSize);
+    cudaMalloc(&d_output, imageSize);
+    cudaMalloc(&d_kernel, kernelSizeBytes);
+    
+    cudaMemcpy(d_input, input, imageSize, cudaMemcpyHostToDevice);
+    cudaMemcpy(d_kernel, kernel, kernelSizeBytes, cudaMemcpyHostToDevice);
+
+    dim3 blockSize(16, 16);
+    dim3 gridSize((width + blockSize.x - 1) / blockSize.x, (height + blockSize.y - 1) / blockSize.y);
+
+    gpu_dilation_kernel<<<gridSize, blockSize>>>(d_input, d_output, width, height, d_kernel, kernelSize);
+    
+    cudaMemcpy(output, d_output, imageSize, cudaMemcpyDeviceToHost);
+    
+    cudaFree(d_input);
+    cudaFree(d_output);
+    cudaFree(d_kernel);
 }
